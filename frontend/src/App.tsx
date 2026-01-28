@@ -5,6 +5,8 @@ import Dashboard from './pages/Dashboard';
 import NetworkVisualization from './pages/NetworkVisualization';
 import AttackDetection from './pages/AttackDetection';
 import Simulation from './pages/Simulation';
+import AttackDetails from './pages/AttackDetails';
+import AttackHistory from './pages/AttackHistory';
 import './App.css';
 
 function App() {
@@ -18,6 +20,8 @@ function App() {
             <Route path="/network" element={<NetworkVisualization />} />
             <Route path="/detection" element={<AttackDetection />} />
             <Route path="/simulation" element={<Simulation />} />
+            <Route path="/attack-details/:attackId" element={<AttackDetails />} />
+            <Route path="/attack-history" element={<AttackHistory />} />
           </Routes>
         </main>
       </div>

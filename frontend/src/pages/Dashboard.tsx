@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Shield, Network, AlertTriangle, TrendingUp, Activity } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { getGraphStats, scanForAttacks, getAttackHistory, generateNetwork } from '../services/api';
+import { SeverityCalculator } from '../utils/severityCalculator';
 
 interface Alert {
   id: number;
@@ -8,57 +10,118 @@ interface Alert {
   severity: string;
   description: string;
   timestamp: string;
+  severityScore?: number;
 }
 
 const Dashboard = () => {
+  const navigate = useNavigate();
   const [stats, setStats] = useState({
     totalNodes: 0,
     totalEdges: 0,
     activeAttacks: 0,
-    networkHealth: 'Good'
+    networkHealth: 'Good',
+    networkRiskScore: 0
   });
 
   const [recentAlerts, setRecentAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
+  const getHealthColor = (health: string) => {
+    switch (health) {
+      case 'Good': return 'text-green-600';
+      case 'Caution': return 'text-yellow-600';
+      case 'Warning': return 'text-orange-600';
+      case 'Critical': return 'text-red-600';
+      default: return 'text-gray-600';
+    }
+  };
 
-  const fetchDashboardData = async () => {
+  const getHealthBgColor = (health: string) => {
+    switch (health) {
+      case 'Good': return 'bg-green-100';
+      case 'Caution': return 'bg-yellow-100';
+      case 'Warning': return 'bg-orange-100';
+      case 'Critical': return 'bg-red-100';
+      default: return 'bg-gray-100';
+    }
+  };
+
+  const getSeverityColor = (severity: string) => {
+    switch (severity) {
+      case 'high': return 'bg-red-100 text-red-800 border-red-200';
+      case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'low': return 'bg-green-100 text-green-800 border-green-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  const calculateNetworkHealth = (activeAttacks: number, recentAlerts: Alert[]) => {
+    // Check for high severity attacks
+    const highSeverityAttacks = recentAlerts.filter(alert => alert.severity === 'high').length;
+    
+    if (highSeverityAttacks > 0) {
+      return 'Critical';
+    } else if (activeAttacks > 2) {
+      return 'Warning';
+    } else if (activeAttacks > 0) {
+      return 'Caution';
+    } else {
+      return 'Good';
+    }
+  };
+
+  const fetchDashboardData = useCallback(async () => {
     setLoading(true);
     try {
       // Fetch graph statistics
       const graphStats = await getGraphStats();
+      
+      // Fetch recent attacks
+      const attackData = await scanForAttacks();
+      
+      // Fetch attack history
+      const historyData = await getAttackHistory();
+      const alerts = historyData.history.slice(0, 5).map((alert: any, index: number) => {
+        const attackData = {
+          attack_type: alert.attack_type,
+          source_nodes: alert.source_nodes,
+          target_nodes: alert.target_nodes,
+          confidence: alert.confidence,
+          severity: alert.severity || 'medium'
+        };
+        
+        return {
+          id: index + 1,
+          type: alert.attack_type,
+          severity: alert.severity || 'medium',
+          description: alert.description,
+          timestamp: new Date(alert.timestamp).toLocaleString(),
+          severityScore: SeverityCalculator.calculateSeverityScore(attackData)
+        };
+      });
+      
+      const networkHealth = calculateNetworkHealth(attackData.total || 0, alerts);
+      const networkRiskScore = SeverityCalculator.calculateNetworkRiskScore(alerts);
+      
       setStats({
         totalNodes: graphStats.node_count || 0,
         totalEdges: graphStats.edge_count || 0,
-        activeAttacks: 0, // Will be updated after scan
-        networkHealth: graphStats.is_connected ? 'Good' : 'Warning'
+        activeAttacks: attackData.total || 0,
+        networkHealth: networkHealth,
+        networkRiskScore: networkRiskScore
       });
-
-      // Fetch recent attacks
-      const attackData = await scanForAttacks();
-      setStats(prev => ({
-        ...prev,
-        activeAttacks: attackData.total || 0
-      }));
-
-      // Fetch attack history
-      const historyData = await getAttackHistory();
-      setRecentAlerts(historyData.history.slice(0, 5).map((alert: any, index: number) => ({
-        id: index + 1,
-        type: alert.attack_type,
-        severity: alert.severity || 'medium',
-        description: alert.description,
-        timestamp: new Date(alert.timestamp).toLocaleString()
-      })));
+      
+      setRecentAlerts(alerts);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
 
   const handleGenerateNetwork = async () => {
     try {
@@ -92,22 +155,20 @@ const Dashboard = () => {
       bgColor: 'bg-red-100'
     },
     {
+      title: 'Network Risk Score',
+      value: `${stats.networkRiskScore}/100`,
+      icon: AlertTriangle,
+      color: stats.networkRiskScore >= 70 ? 'text-red-600' : stats.networkRiskScore >= 40 ? 'text-yellow-600' : 'text-green-600',
+      bgColor: stats.networkRiskScore >= 70 ? 'bg-red-100' : stats.networkRiskScore >= 40 ? 'bg-yellow-100' : 'bg-green-100'
+    },
+    {
       title: 'Network Health',
       value: stats.networkHealth,
       icon: TrendingUp,
-      color: 'text-purple-600',
-      bgColor: 'bg-purple-100'
+      color: getHealthColor(stats.networkHealth),
+      bgColor: getHealthBgColor(stats.networkHealth)
     }
   ];
-
-  const getSeverityColor = (severity: string) => {
-    switch (severity) {
-      case 'high': return 'bg-red-100 text-red-800 border-red-200';
-      case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'low': return 'bg-green-100 text-green-800 border-green-200';
-      default: return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
-  };
 
   return (
     <div className="space-y-6">
@@ -170,11 +231,19 @@ const Dashboard = () => {
                       <span className="text-xs px-2 py-1 rounded-full bg-white bg-opacity-60">
                         {alert.severity}
                       </span>
+                      {alert.severityScore && (
+                        <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-800 font-medium">
+                          Score: {alert.severityScore}
+                        </span>
+                      )}
                     </div>
                     <p className="text-sm mt-1">{alert.description}</p>
                     <p className="text-xs mt-2 opacity-75">{alert.timestamp}</p>
                   </div>
-                  <button className="ml-4 text-sm font-medium hover:underline">
+                  <button 
+                    onClick={() => navigate(`/attack-details/${alert.id}`)}
+                    className="ml-4 text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                  >
                     View Details
                   </button>
                 </div>

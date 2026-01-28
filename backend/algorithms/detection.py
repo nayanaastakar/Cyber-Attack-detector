@@ -1,6 +1,7 @@
 from typing import List, Set, Dict, Tuple
 from collections import defaultdict, deque
 import networkx as nx
+from datetime import datetime
 from models.graph import NetworkGraph, AttackType, AttackAlert
 
 class AttackDetector:
@@ -30,7 +31,7 @@ class AttackDetector:
                     source_nodes=source_nodes,
                     target_nodes=[node_id],
                     confidence=min(1.0, indegree / (threshold * 2)),
-                    timestamp=0.0,  # Would be current time in real implementation
+                    timestamp=datetime.now().isoformat(),
                     description=f"DDoS attack detected: {indegree} incoming connections to {node_id}",
                     severity="high" if indegree > threshold * 2 else "medium"
                 )
@@ -56,7 +57,7 @@ class AttackDetector:
                         source_nodes=cycle,
                         target_nodes=cycle,  # In botnet, same nodes act as both
                         confidence=min(1.0, len(cycle) / 10.0),
-                        timestamp=0.0,
+                        timestamp=datetime.now().isoformat(),
                         description=f"Botnet communication cycle detected: {len(cycle)} nodes in loop",
                         severity="high" if len(cycle) >= 5 else "medium"
                     )
@@ -89,7 +90,7 @@ class AttackDetector:
                     source_nodes=[node_id],
                     target_nodes=target_nodes,
                     confidence=min(1.0, outdegree / (threshold * 2)),
-                    timestamp=0.0,
+                    timestamp=datetime.now().isoformat(),
                     description=f"Port scan detected: {outdegree} connection attempts from {node_id}",
                     severity="medium"
                 )
@@ -126,7 +127,7 @@ class AttackDetector:
                     source_nodes=[candidate],
                     target_nodes=reachable_nodes,
                     confidence=min(1.0, len(reachable_nodes) / (threshold * 2)),
-                    timestamp=0.0,
+                    timestamp=datetime.now().isoformat(),
                     description=f"Worm propagation detected: {len(reachable_nodes)} nodes reachable from {candidate}",
                     severity="high" if len(reachable_nodes) > threshold * 2 else "medium"
                 )
@@ -158,7 +159,7 @@ class AttackDetector:
                     source_nodes=infected_nodes,
                     target_nodes=[node_id],
                     confidence=min(1.0, indegree / (min_indegree * 2)),
-                    timestamp=0.0,
+                    timestamp=datetime.now().isoformat(),
                     description=f"C2 server detected: {indegree} infected nodes reporting to {node_id}",
                     severity="high" if indegree > min_indegree * 3 else "medium"
                 )

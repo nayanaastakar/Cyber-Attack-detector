@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Shield, Network, AlertTriangle, Play, BarChart3 } from 'lucide-react';
+import { Shield, Network, AlertTriangle, Play, BarChart3, Clock } from 'lucide-react';
 
 const Header = () => {
   const location = useLocation();
@@ -10,6 +10,7 @@ const Header = () => {
     { name: 'Network', href: '/network', icon: Network },
     { name: 'Detection', href: '/detection', icon: AlertTriangle },
     { name: 'Simulation', href: '/simulation', icon: Play },
+    { name: 'Attack History', href: '/attack-history', icon: Clock },
   ];
 
   return (
